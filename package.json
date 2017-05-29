@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": false,
   "scripts": {
-    "debug": "node DEBUG=my-express-app:* ./bin/www",
+    "test": "node DEBUG=my-express-app:* ./bin/www",
     "start": "node ./bin/www"
   },
   "dependencies": {
