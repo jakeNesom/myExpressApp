@@ -3,9 +3,11 @@
 /**
  * Module dependencies.
  */
+// http://blog.danyll.com/setting-up-express-with-nginx-and-pm2/
+
 
 var app = require('../app');
-var debug = require('debug')('myapp:server');
+var debug = require('debug')('my-express-app:server');
 var http = require('http');
 
 /**
