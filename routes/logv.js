@@ -8,8 +8,21 @@ var url = 'mongodb://localhost:27017/db1'
 
 var bodyParser = require('body-parser');
 var cors = require ('cors');
-
+var milliepoch = require ('milli-epoch');
 var myEG = new EntryGen(1, 1800000);
+
+var corsOptions = {
+  "origin": "*",
+  "methods": "GET,HEAD,PUT,PATCH,POST,DELETE",
+  "preflightContinue": false,
+  "optionsSuccessStatus": 204
+}
+
+router.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
 
 
 /* GET users listing. */
@@ -39,31 +52,37 @@ router.get('/read/all', function(req, res, next) {
   });
 });
 
-router.get('/write', function(req, res, next) { 
+router.get('/write', cors(corsOptions), function(req, res, next) { 
   
   console.log('route /logv/write fired');
   
-  if(req.query) console.dir(req.query);
+  console.dir(req.query);
 
-  if(req.query.create && req.query.create === 'true') {
-    var clientArr = [];
-    for(let i = 0; i < 30; i ++ ) {
-      clientArr.push(myEG.createClient());
+  if(req.query.create) {
+    if(req.query.create === 'true' )
+    {
+      var clientArr = [];
+      for(let i = 0; i < 30; i ++ ) {
+        clientArr.push(myEG.createClient());
+      }
+      
+
+      MongoClient.connect(url, function (err, db) {
+            assert.equal(null, err);
+            // Get the documents collection, using the collection json
+            var collection = db.collection('clientLogs');
+
+            collection.insertMany(clientArr);
+            res.send( JSON.stringify(clientArr) );
+            
+            db.close();
+            
+            
+      });
     }
-    
-
-    MongoClient.connect(url, function (err, db) {
-          assert.equal(null, err);
-          // Get the documents collection, using the collection json
-          var collection = db.collection('clientLogs');
-
-          collection.insertMany(clientArr);
-          db.close();
-          
-    });
   }
   else {
-    res.send('hello logv/write/  route 2');
+    res.send('create Param not set');
   }
 
   
@@ -72,35 +91,45 @@ router.get('/write', function(req, res, next) {
 });
 
 
-router.get('/read/getfiltered/aggregate', function (req, res) {
+router.get('/read/getfiltered/aggregate', cors(corsOptions), function (req, res) {
     var errDatabase = "Must provide database info";
     console.dir(req.query);
     if (req.query.database) {
 
-        if (req.query.database == 'clientserverExpSockIO') {
-            var url = 'mongodb://localhost:27017/clientserverExpSockIO';
+        if (req.query.database === 'clientserverExpSockIO') {
+            var url = 'mongodb://localhost:27017/db1';
+            //var url = 'mongodb://localhost:27017/clientserverExpSockIO';
             console.log('connected');
         }
-        else
-            var url = 'mongodb://localhost:27017/NodeDB';
+        else if(req.query.database === 'db1') {
+             var url = 'mongodb://localhost:27017/db1';
+        }
+        else if(req.query.database === 'NodeDB') {
+          var url = 'mongodb://localhost:27017/NodeDB';
+        }
+            
 
     }
-    else
+    else {
         res.send(JSON.stringify(errDatabase));
-
+    }
     MongoClient.connect(url, function (err, db) {
         assert.equal(null, err);
         console.log('connected');
-        var collection = db.collection('json');
+        //var collection = db.collection('json');
+        var collection = db.collection('clientLogs');
         var start;
         var end;
         if (req.query.startTime && req.query.stopTime) {
             start = parseInt(req.query.startTime);
             end = parseInt(req.query.stopTime);
+            console.log('startTime Set: ' + start);
         }
         else
             if (req.query.startTime) {
+                
                 start = parseInt(req.query.startTime);
+                console.log('startTime Set: ' + start);
                 end = milliepoch.now();
             }
             else
@@ -151,7 +180,7 @@ router.get('/read/getfiltered/aggregate', function (req, res) {
 
             });
         }
-        if (req.query.client) {
+        else if (req.query.client) {
             collection.aggregate([
                 {
                     $match: { Time: { $gt: start, $lt: end }, Client: req.query.client }
@@ -171,6 +200,7 @@ router.get('/read/getfiltered/aggregate', function (req, res) {
         }
         else
             {
+               console.log('else fired');
                 collection.aggregate([
                     {
                         $match: { Time: { $gt: start, $lt: end } }
@@ -180,6 +210,7 @@ router.get('/read/getfiltered/aggregate', function (req, res) {
                         { _id: "$" + req.query.groupType, total: { $sum: 1 } }
                     }
                 ], function (err, docs) {
+                    if(err) console.log(err);
                     assert.equal(err, null);
                     console.log(docs);
                     res.setHeader('Content-Type', 'application/json');
